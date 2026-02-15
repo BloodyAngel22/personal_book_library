@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/app_constants.dart';
@@ -24,7 +23,7 @@ class BookDetailScreen extends StatefulWidget {
 class _BookDetailScreenState extends State<BookDetailScreen> {
   late BookModel _currentBook;
   late TextEditingController _pageController;
-  bool _isEditing = false;
+  bool _isUpdating = false;
 
   @override
   void initState() {
@@ -45,14 +44,14 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       listener: (context, state) {
         if (state is BookDetailLoaded) {
           setState(() => _currentBook = state.book);
+          _pageController.text = _currentBook.currentPage.toString();
         }
-        if (state is BookOperationSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+        if (state is BookOperationSuccess && state.book != null) {
+          setState(() => _currentBook = state.book!);
         }
       },
       builder: (context, state) {
+        // Always show the current book data, even during loading states
         return Scaffold(
           body: CustomScrollView(
             slivers: [
@@ -142,17 +141,12 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: _currentBook.thumbnailUrl != null
-            ? CachedNetworkImage(
-                imageUrl: _currentBook.thumbnailUrl!,
+            ? Image.network(
+                _currentBook.thumbnailUrl!,
                 width: 120,
                 height: 180,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => const ShimmerLoading(
-                  width: 120,
-                  height: 180,
-                  borderRadius: 12,
-                ),
-                errorWidget: (context, url, error) => _buildPlaceholderCover(),
+                errorBuilder: (context, error, stackTrace) => _buildPlaceholderCover(),
               )
             : _buildPlaceholderCover(),
       ),
@@ -477,7 +471,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => _startReading(),
+              onPressed: _isUpdating ? null : () => _startReading(),
               icon: const Icon(Icons.auto_stories),
               label: const Text('Start Reading'),
               style: ElevatedButton.styleFrom(
@@ -491,7 +485,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _markAsFinished(),
+                  onPressed: _isUpdating ? null : () => _markAsFinished(),
                   icon: const Icon(Icons.check_circle),
                   label: const Text('Mark Finished'),
                   style: OutlinedButton.styleFrom(
@@ -507,7 +501,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _readAgain(),
+                  onPressed: _isUpdating ? null : () => _readAgain(),
                   icon: const Icon(Icons.refresh),
                   label: const Text('Read Again'),
                   style: OutlinedButton.styleFrom(
@@ -547,7 +541,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             onPressed: () {
               Navigator.pop(context);
               context.read<BookCubit>().deleteBook(_currentBook.id!);
-              Navigator.pop(context);
+              Navigator.pop(context); // Go back to home
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
@@ -560,7 +554,9 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   }
 
   void _updateProgress(int currentPage) {
-    if (_currentBook.id == null) return;
+    if (_currentBook.id == null || _isUpdating) return;
+
+    setState(() => _isUpdating = true);
 
     final clampedPage = currentPage.clamp(0, _currentBook.totalPages);
     _pageController.text = clampedPage.toString();
@@ -568,26 +564,51 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     context.read<BookCubit>().updateProgress(
           bookId: _currentBook.id!,
           currentPage: clampedPage,
-        );
+        ).then((_) {
+          if (mounted) {
+            setState(() => _isUpdating = false);
+          }
+        });
   }
 
   void _startReading() {
-    if (_currentBook.id == null) return;
-    context.read<BookCubit>().startReading(_currentBook.id!);
+    if (_currentBook.id == null || _isUpdating) return;
+
+    setState(() => _isUpdating = true);
+
+    context.read<BookCubit>().startReading(_currentBook.id!).then((_) {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    });
   }
 
   void _markAsFinished() {
-    if (_currentBook.id == null) return;
-    context.read<BookCubit>().finishBook(_currentBook.id!);
+    if (_currentBook.id == null || _isUpdating) return;
+
+    setState(() => _isUpdating = true);
+
+    context.read<BookCubit>().finishBook(_currentBook.id!).then((_) {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    });
   }
 
   void _readAgain() {
-    if (_currentBook.id == null) return;
+    if (_currentBook.id == null || _isUpdating) return;
+
+    setState(() => _isUpdating = true);
+
     context.read<BookCubit>().updateProgress(
           bookId: _currentBook.id!,
           currentPage: 0,
           status: AppConstants.statusToRead,
-        );
+        ).then((_) {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    });
   }
 
   void _showEditPagesDialog() {

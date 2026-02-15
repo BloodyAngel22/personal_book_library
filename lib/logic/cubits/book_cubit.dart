@@ -8,6 +8,9 @@ import '../states/book_state.dart';
 class BookCubit extends Cubit<BookState> {
   final BookRepository _repository;
 
+  /// Cache the last loaded books to avoid unnecessary reloading
+  BooksLoaded? _lastLoadedState;
+
   BookCubit({BookRepository? repository})
       : _repository = repository ?? BookRepository(),
         super(const BookInitial());
@@ -21,20 +24,42 @@ class BookCubit extends Cubit<BookState> {
       final finishedBooks = await _repository.getFinishedBooks();
       final statistics = await _repository.getStatistics();
 
-      emit(BooksLoaded(
+      _lastLoadedState = BooksLoaded(
         toReadBooks: toReadBooks,
         readingBooks: readingBooks,
         finishedBooks: finishedBooks,
         statistics: statistics,
-      ));
+      );
+
+      emit(_lastLoadedState!);
     } catch (e) {
       emit(BookError('Failed to load books: ${e.toString()}'));
     }
   }
 
+  /// Refresh books list silently (without showing loading)
+  Future<void> _refreshBooksSilently() async {
+    try {
+      final toReadBooks = await _repository.getToReadBooks();
+      final readingBooks = await _repository.getReadingBooks();
+      final finishedBooks = await _repository.getFinishedBooks();
+      final statistics = await _repository.getStatistics();
+
+      _lastLoadedState = BooksLoaded(
+        toReadBooks: toReadBooks,
+        readingBooks: readingBooks,
+        finishedBooks: finishedBooks,
+        statistics: statistics,
+      );
+
+      emit(_lastLoadedState!);
+    } catch (e) {
+      // Don't emit error for silent refresh
+    }
+  }
+
   /// Load a single book by ID
   Future<void> loadBookById(int id) async {
-    emit(const BookLoading());
     try {
       final book = await _repository.getBookById(id);
       if (book != null) {
@@ -80,7 +105,7 @@ class BookCubit extends Cubit<BookState> {
     }
   }
 
-  /// Update reading progress
+  /// Update reading progress - properly refreshes the book list
   Future<void> updateProgress({
     required int bookId,
     required int currentPage,
@@ -92,7 +117,12 @@ class BookCubit extends Cubit<BookState> {
         currentPage: currentPage,
         status: status,
       );
+      
+      // Emit the updated book detail
       emit(BookDetailLoaded(updatedBook));
+      
+      // Refresh the books list silently to update the tabs
+      await _refreshBooksSilently();
     } catch (e) {
       emit(BookError('Failed to update progress: ${e.toString()}'));
     }
@@ -184,13 +214,18 @@ class BookCubit extends Cubit<BookState> {
     }
   }
 
-  /// Clear search results
+  /// Clear search results and restore last books state
   void clearSearch() {
-    emit(const SearchResultsLoaded());
+    if (_lastLoadedState != null) {
+      emit(_lastLoadedState!);
+    } else {
+      emit(const BooksLoaded());
+    }
   }
 
   /// Reset to initial state
   void reset() {
+    _lastLoadedState = null;
     emit(const BookInitial());
   }
 
@@ -203,4 +238,7 @@ class BookCubit extends Cubit<BookState> {
   Future<bool> isIsbnExists(String isbn) async {
     return await _repository.isIsbnExists(isbn);
   }
+
+  /// Get the last loaded books state (useful for navigation)
+  BooksLoaded? get lastLoadedState => _lastLoadedState;
 }

@@ -22,20 +22,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this);
+    // Load books on init
     context.read<BookCubit>().loadBooks();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh books when app comes back to foreground
+    if (state == AppLifecycleState.resumed) {
+      context.read<BookCubit>().loadBooks();
+    }
   }
 
   @override
@@ -62,8 +73,20 @@ class _HomeScreenState extends State<HomeScreen>
           ],
         ),
       ),
-      body: BlocBuilder<BookCubit, BookState>(
+      body: BlocConsumer<BookCubit, BookState>(
+        listener: (context, state) {
+          // Handle operation success messages
+          if (state is BookOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        },
         builder: (context, state) {
+          // Show loading only on initial load
           if (state is BookLoading) {
             return const ShimmerBookList();
           }
@@ -75,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen>
             );
           }
 
+          // Show books list for BooksLoaded state
           if (state is BooksLoaded) {
             return TabBarView(
               controller: _tabController,
@@ -82,6 +106,20 @@ class _HomeScreenState extends State<HomeScreen>
                 _buildBookList(state.toReadBooks, 'No books to read'),
                 _buildBookList(state.readingBooks, 'No books in progress'),
                 _buildBookList(state.finishedBooks, 'No finished books'),
+              ],
+            );
+          }
+
+          // For other states (like BookDetailLoaded, BookOperationSuccess),
+          // try to show the cached books from the cubit
+          final lastState = context.read<BookCubit>().lastLoadedState;
+          if (lastState != null) {
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                _buildBookList(lastState.toReadBooks, 'No books to read'),
+                _buildBookList(lastState.readingBooks, 'No books in progress'),
+                _buildBookList(lastState.finishedBooks, 'No finished books'),
               ],
             );
           }
@@ -124,17 +162,25 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _navigateToSearch(BuildContext context) {
-    Navigator.push(
+  void _navigateToSearch(BuildContext context) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const SearchScreen()),
     );
+    // Refresh books when returning from search (in case books were added)
+    if (mounted) {
+      context.read<BookCubit>().loadBooks();
+    }
   }
 
-  void _navigateToManualEntry(BuildContext context) {
-    Navigator.push(
+  void _navigateToManualEntry(BuildContext context) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ManualEntryScreen()),
     );
+    // Refresh books when returning from manual entry (in case a book was added)
+    if (mounted) {
+      context.read<BookCubit>().loadBooks();
+    }
   }
 }
