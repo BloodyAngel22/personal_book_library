@@ -29,7 +29,7 @@ class BooksLoaded extends BookState {
   const BooksLoaded({
     this.toReadBooks = const [],
     this.readingBooks = const [],
-    this.finishedBooks = const const [],
+    this.finishedBooks = const [],
     this.statistics,
   });
 

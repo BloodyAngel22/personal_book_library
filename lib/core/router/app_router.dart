@@ -1,4 +1,3 @@
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import '../../presentation/screens/home_screen.dart';
 import '../../presentation/screens/search_screen.dart';
@@ -7,39 +6,137 @@ import '../../presentation/screens/manual_entry_screen.dart';
 import '../../presentation/screens/scanner_screen.dart';
 import '../../data/models/book_model.dart';
 
-part 'app_router.gr.dart';
+/// Simple router configuration without code generation
+class AppRouter {
+  /// Generate routes for the app
+  static Route<dynamic> generateRoute(RouteSettings settings) {
+    switch (settings.name) {
+      case '/':
+        return MaterialPageRoute(
+          builder: (_) => const HomeScreen(),
+          settings: settings,
+        );
+      case '/search':
+        return MaterialPageRoute(
+          builder: (_) => const SearchScreen(),
+          settings: settings,
+        );
+      case '/book-detail':
+        final args = settings.arguments as BookDetailArgs?;
+        if (args == null) {
+          return MaterialPageRoute(
+            builder: (_) => const Scaffold(
+              body: Center(child: Text('Error: Book not provided')),
+            ),
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => BookDetailScreen(book: args.book),
+          settings: settings,
+        );
+      case '/manual-entry':
+        return MaterialPageRoute(
+          builder: (_) => const ManualEntryScreen(),
+          settings: settings,
+        );
+      case '/scanner':
+        return MaterialPageRoute(
+          builder: (_) => const ScannerScreen(),
+          settings: settings,
+        );
+      default:
+        return MaterialPageRoute(
+          builder: (_) => const Scaffold(
+            body: Center(child: Text('Error: Page not found')),
+          ),
+        );
+    }
+  }
 
-@MaterialAutoRouter(
-  replaceInRouteName: 'Screen,Route',
-  routes: <AutoRoute>[
-    AutoRoute(
-      page: HomeScreen,
-      path: '/',
-      initial: true,
-    ),
-    AutoRoute(
-      page: SearchScreen,
-      path: '/search',
-    ),
-    AutoRoute(
-      page: BookDetailScreen,
-      path: '/book-detail',
-    ),
-    AutoRoute(
-      page: ManualEntryScreen,
-      path: '/manual-entry',
-    ),
-    AutoRoute(
-      page: ScannerScreen,
-      path: '/scanner',
-    ),
-  ],
-)
-class AppRouter extends _$AppRouter {}
+  /// Get the router delegate for MaterialApp
+  static RouterConfig<Object> get routerConfig {
+    return RouterConfig(
+      routerDelegate: SimpleRouterDelegate(
+        builder: (context, state) => Navigator(
+          pages: [
+            MaterialPage(
+              key: const ValueKey('home'),
+              child: const HomeScreen(),
+            ),
+          ],
+          onPopPage: (route, result) => false,
+        ),
+      ),
+      routeInformationParser: SimpleRouteInformationParser(),
+    );
+  }
+}
 
-/// Route arguments for type-safe navigation
+/// Simple router delegate
+class SimpleRouterDelegate extends RouterDelegate<RouteInformation>
+    with ChangeNotifier {
+  final Widget Function(BuildContext, RouteInformation) builder;
+
+  SimpleRouterDelegate({required this.builder});
+
+  @override
+  RouteInformation get currentConfiguration => RouteInformation(uri: Uri.parse('/'));
+
+  @override
+  Widget build(BuildContext context) => builder(context, currentConfiguration);
+
+  @override
+  Future<void> setNewRoutePath(RouteInformation configuration) async {}
+}
+
+/// Simple route information parser
+class SimpleRouteInformationParser extends RouteInformationParser<RouteInformation> {
+  @override
+  Future<RouteInformation> parseRouteInformation(RouteInformation routeInformation) async {
+    return routeInformation;
+  }
+
+  @override
+  RouteInformation restoreRouteInformation(RouteInformation configuration) {
+    return configuration;
+  }
+}
+
+/// Route arguments for book detail screen
 class BookDetailArgs {
   final BookModel book;
 
   const BookDetailArgs({required this.book});
+}
+
+/// Navigation helper class
+class AppNavigator {
+  /// Navigate to search screen
+  static void toSearch(BuildContext context) {
+    Navigator.pushNamed(context, '/search');
+  }
+
+  /// Navigate to book detail screen
+  static void toBookDetail(BuildContext context, BookModel book) {
+    Navigator.pushNamed(
+      context,
+      '/book-detail',
+      arguments: BookDetailArgs(book: book),
+    );
+  }
+
+  /// Navigate to manual entry screen
+  static void toManualEntry(BuildContext context) {
+    Navigator.pushNamed(context, '/manual-entry');
+  }
+
+  /// Navigate to scanner screen
+  static void toScanner(BuildContext context) {
+    Navigator.pushNamed(context, '/scanner');
+  }
+
+  /// Go back
+  static void pop(BuildContext context, [Object? result]) {
+    Navigator.pop(context, result);
+  }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Custom circular progress indicator with percentage
-class CircularProgressIndicator extends StatelessWidget {
+/// Custom circular progress indicator with percentage display
+class CircularPercentageIndicator extends StatelessWidget {
   final double progress;
   final double size;
   final double strokeWidth;
@@ -10,7 +10,7 @@ class CircularProgressIndicator extends StatelessWidget {
   final Color? backgroundColor;
   final Widget? center;
 
-  const CircularProgressIndicator({
+  const CircularPercentageIndicator({
     super.key,
     required this.progress,
     this.size = 60,
@@ -33,7 +33,6 @@ class CircularProgressIndicator extends StatelessWidget {
             width: size,
             height: size,
             child: CircularProgressIndicator(
-              value: 1,
               strokeWidth: strokeWidth,
               valueColor: AlwaysStoppedAnimation(
                 backgroundColor ?? Colors.grey.shade800,
@@ -45,11 +44,12 @@ class CircularProgressIndicator extends StatelessWidget {
             width: size,
             height: size,
             child: CircularProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
               strokeWidth: strokeWidth,
+              value: progress.clamp(0.0, 1.0),
               valueColor: AlwaysStoppedAnimation(
                 progressColor ?? Theme.of(context).colorScheme.primary,
               ),
+              backgroundColor: Colors.transparent,
             ),
           ),
           // Center content

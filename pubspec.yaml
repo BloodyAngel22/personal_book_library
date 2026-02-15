@@ -19,9 +19,6 @@ dependencies:
   path: ^1.8.3
   path_provider: ^2.1.1
 
-  # Navigation
-  auto_route: ^7.8.4
-
   # Networking
   dio: ^5.4.0
   connectivity_plus: ^5.0.2
@@ -44,18 +41,9 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
-  auto_route_generator: ^7.3.2
-  build_runner: ^2.4.7
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
-
-  fonts:
-    - family: Roboto
-      fonts:
-        - asset: fonts/Roboto-Regular.ttf
-        - asset: fonts/Roboto-Bold.ttf
-          weight: 700

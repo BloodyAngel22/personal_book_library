@@ -43,7 +43,7 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: _cardColor,
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -115,7 +115,7 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: _secondaryColor,
         unselectedLabelColor: Colors.grey.shade600,
         indicator: BoxDecoration(
@@ -123,6 +123,7 @@ class AppTheme {
             bottom: BorderSide(color: _secondaryColor, width: 2),
           ),
         ),
+        dividerColor: Colors.transparent,
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: _primaryColor,
@@ -143,7 +144,7 @@ class AppTheme {
         ),
         behavior: SnackBarBehavior.floating,
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: _cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),

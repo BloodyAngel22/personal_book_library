@@ -21,17 +21,13 @@ class PersonalBookLibraryApp extends StatelessWidget {
           create: (context) => BookCubit(),
         ),
       ],
-      child: MaterialApp.router(
+      child: MaterialApp(
         title: 'Personal Book Library',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
-        routerConfig: _createRouter(),
+        initialRoute: '/',
+        onGenerateRoute: AppRouter.generateRoute,
       ),
     );
-  }
-
-  RouteInformationParser<Object> _createRouter() {
-    final router = AppRouter();
-    return router.config();
   }
 }

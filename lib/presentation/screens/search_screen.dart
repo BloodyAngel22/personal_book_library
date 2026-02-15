@@ -5,7 +5,6 @@ import '../../data/models/book_model.dart';
 import '../../logic/cubits/book_cubit.dart';
 import '../../logic/states/book_state.dart';
 import '../widgets/book_card_widget.dart';
-import '../widgets/progress_indicator_widget.dart';
 import '../widgets/shimmer_loading.dart';
 import 'scanner_screen.dart';
 
@@ -136,7 +135,7 @@ class _SearchScreenState extends State<SearchScreen> {
               children: [
                 _buildQuickAction(
                   'Search Online',
-                  Icons.cloud_search,
+                  Icons.travel_explore,
                   () => _performSearch(_searchController.text),
                 ),
                 _buildQuickAction(
