@@ -52,54 +52,6 @@ class AppRouter {
         );
     }
   }
-
-  /// Get the router delegate for MaterialApp
-  static RouterConfig<Object> get routerConfig {
-    return RouterConfig(
-      routerDelegate: SimpleRouterDelegate(
-        builder: (context, state) => Navigator(
-          pages: [
-            MaterialPage(
-              key: const ValueKey('home'),
-              child: const HomeScreen(),
-            ),
-          ],
-          onPopPage: (route, result) => false,
-        ),
-      ),
-      routeInformationParser: SimpleRouteInformationParser(),
-    );
-  }
-}
-
-/// Simple router delegate
-class SimpleRouterDelegate extends RouterDelegate<RouteInformation>
-    with ChangeNotifier {
-  final Widget Function(BuildContext, RouteInformation) builder;
-
-  SimpleRouterDelegate({required this.builder});
-
-  @override
-  RouteInformation get currentConfiguration => RouteInformation(uri: Uri.parse('/'));
-
-  @override
-  Widget build(BuildContext context) => builder(context, currentConfiguration);
-
-  @override
-  Future<void> setNewRoutePath(RouteInformation configuration) async {}
-}
-
-/// Simple route information parser
-class SimpleRouteInformationParser extends RouteInformationParser<RouteInformation> {
-  @override
-  Future<RouteInformation> parseRouteInformation(RouteInformation routeInformation) async {
-    return routeInformation;
-  }
-
-  @override
-  RouteInformation restoreRouteInformation(RouteInformation configuration) {
-    return configuration;
-  }
 }
 
 /// Route arguments for book detail screen
