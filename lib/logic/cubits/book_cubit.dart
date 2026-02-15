@@ -150,44 +150,155 @@ class BookCubit extends Cubit<BookState> {
     }
   }
 
-  /// Search books online
-  Future<void> searchOnline(String query) async {
-    if (query.trim().isEmpty) {
-      emit(const SearchResultsLoaded());
-      return;
-    }
+  // ==================== LOCAL SEARCH (Library Search) ====================
 
-    emit(const BookLoading());
+  /// Search books in local library with filters
+  Future<void> searchLocalLibrary({
+    String query = '',
+    LocalSearchFilters? filters,
+  }) async {
+    final currentFilters = filters ?? const LocalSearchFilters();
+    
     try {
-      final onlineResults = await _repository.searchOnline(query);
-      final localResults = await _repository.searchLocal(query);
-      emit(SearchResultsLoaded(
-        onlineResults: onlineResults,
-        localResults: localResults,
+      // Get all books first
+      final allBooks = await _repository.getAllBooks();
+      
+      // Apply filters
+      var filteredBooks = allBooks.where((book) {
+        // Status filter
+        if (!currentFilters.statuses.contains(book.status)) {
+          return false;
+        }
+        
+        // Query filter (search in title and author)
+        if (query.isNotEmpty) {
+          final queryLower = query.toLowerCase();
+          final titleMatch = book.title.toLowerCase().contains(queryLower);
+          final authorMatch = book.author.toLowerCase().contains(queryLower);
+          final isbnMatch = book.isbn?.contains(query) ?? false;
+          if (!titleMatch && !authorMatch && !isbnMatch) {
+            return false;
+          }
+        }
+        
+        // Author filter
+        if (currentFilters.author != null && currentFilters.author!.isNotEmpty) {
+          if (!book.author.toLowerCase().contains(currentFilters.author!.toLowerCase())) {
+            return false;
+          }
+        }
+        
+        // Has progress filter
+        if (currentFilters.hasProgress && book.currentPage <= 0) {
+          return false;
+        }
+        
+        return true;
+      }).toList();
+      
+      // Apply sorting
+      filteredBooks.sort((a, b) {
+        int result;
+        switch (currentFilters.sortBy) {
+          case SortOption.title:
+            result = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+            break;
+          case SortOption.author:
+            result = a.author.toLowerCase().compareTo(b.author.toLowerCase());
+            break;
+          case SortOption.progress:
+            result = a.progressPercentage.compareTo(b.progressPercentage);
+            break;
+          case SortOption.startDate:
+            final dateA = a.startDate ?? DateTime(1970);
+            final dateB = b.startDate ?? DateTime(1970);
+            result = dateA.compareTo(dateB);
+            break;
+          case SortOption.updatedAt:
+          default:
+            final dateA = a.updatedAt ?? DateTime(1970);
+            final dateB = b.updatedAt ?? DateTime(1970);
+            result = dateA.compareTo(dateB);
+        }
+        return currentFilters.sortAscending ? result : -result;
+      });
+      
+      emit(LocalSearchResultsLoaded(
+        results: filteredBooks,
         query: query,
+        filters: currentFilters,
+        totalMatches: filteredBooks.length,
       ));
     } catch (e) {
       emit(BookError('Search failed: ${e.toString()}'));
     }
   }
 
-  /// Search local books only
-  Future<void> searchLocal(String query) async {
+  /// Update filters for local search
+  Future<void> updateLocalSearchFilters(LocalSearchFilters filters) async {
+    final currentState = state;
+    String query = '';
+    if (currentState is LocalSearchResultsLoaded) {
+      query = currentState.query;
+    }
+    await searchLocalLibrary(query: query, filters: filters);
+  }
+
+  /// Clear local search and return to books list
+  void clearLocalSearch() {
+    if (_lastLoadedState != null) {
+      emit(_lastLoadedState!);
+    } else {
+      emit(const BooksLoaded());
+    }
+  }
+
+  // ==================== ONLINE SEARCH (Add Books) ====================
+
+  /// Search for books online (for adding new books)
+  Future<void> searchOnline(String query, {Set<String>? addedIsbns}) async {
     if (query.trim().isEmpty) {
-      emit(const SearchResultsLoaded());
+      emit(OnlineSearchResultsLoaded(
+        addedIsbns: addedIsbns ?? {},
+      ));
       return;
     }
 
+    emit(OnlineSearchResultsLoaded(
+      query: query,
+      isLoading: true,
+      addedIsbns: addedIsbns ?? {},
+    ));
+    
     try {
-      final localResults = await _repository.searchLocal(query);
-      emit(SearchResultsLoaded(
-        localResults: localResults,
+      final results = await _repository.searchOnline(query);
+      emit(OnlineSearchResultsLoaded(
+        results: results,
         query: query,
+        isLoading: false,
+        addedIsbns: addedIsbns ?? {},
       ));
     } catch (e) {
-      emit(BookError('Local search failed: ${e.toString()}'));
+      emit(BookError('Online search failed: ${e.toString()}'));
     }
   }
+
+  /// Mark a book as added in online search results
+  void markBookAsAdded(String isbn) {
+    final currentState = state;
+    if (currentState is OnlineSearchResultsLoaded) {
+      final newAddedIsbns = Set<String>.from(currentState.addedIsbns);
+      newAddedIsbns.add(isbn);
+      emit(currentState.copyWith(addedIsbns: newAddedIsbns));
+    }
+  }
+
+  /// Clear online search results
+  void clearOnlineSearch() {
+    emit(const OnlineSearchResultsLoaded());
+  }
+
+  // ==================== SCANNER ====================
 
   /// Fetch book by ISBN (for scanner)
   Future<void> fetchBookByIsbn(String isbn) async {
@@ -214,14 +325,7 @@ class BookCubit extends Cubit<BookState> {
     }
   }
 
-  /// Clear search results and restore last books state
-  void clearSearch() {
-    if (_lastLoadedState != null) {
-      emit(_lastLoadedState!);
-    } else {
-      emit(const BooksLoaded());
-    }
-  }
+  // ==================== UTILITIES ====================
 
   /// Reset to initial state
   void reset() {
@@ -241,4 +345,16 @@ class BookCubit extends Cubit<BookState> {
 
   /// Get the last loaded books state (useful for navigation)
   BooksLoaded? get lastLoadedState => _lastLoadedState;
+  
+  /// Get all unique authors from library (for filter dropdown)
+  Future<List<String>> getAuthors() async {
+    final books = await _repository.getAllBooks();
+    final authors = <String>{};
+    for (final book in books) {
+      authors.add(book.author);
+    }
+    final authorList = authors.toList();
+    authorList.sort();
+    return authorList;
+  }
 }

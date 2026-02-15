@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../presentation/screens/home_screen.dart';
-import '../../presentation/screens/search_screen.dart';
+import '../../presentation/screens/local_search_screen.dart';
+import '../../presentation/screens/online_search_screen.dart';
 import '../../presentation/screens/book_detail_screen.dart';
 import '../../presentation/screens/manual_entry_screen.dart';
 import '../../presentation/screens/scanner_screen.dart';
@@ -16,9 +17,14 @@ class AppRouter {
           builder: (_) => const HomeScreen(),
           settings: settings,
         );
-      case '/search':
+      case '/local-search':
         return MaterialPageRoute(
-          builder: (_) => const SearchScreen(),
+          builder: (_) => const LocalSearchScreen(),
+          settings: settings,
+        );
+      case '/online-search':
+        return MaterialPageRoute(
+          builder: (_) => const OnlineSearchScreen(),
           settings: settings,
         );
       case '/book-detail':
@@ -63,9 +69,14 @@ class BookDetailArgs {
 
 /// Navigation helper class
 class AppNavigator {
-  /// Navigate to search screen
-  static void toSearch(BuildContext context) {
-    Navigator.pushNamed(context, '/search');
+  /// Navigate to local search screen (search library)
+  static void toLocalSearch(BuildContext context) {
+    Navigator.pushNamed(context, '/local-search');
+  }
+
+  /// Navigate to online search screen (add books)
+  static void toOnlineSearch(BuildContext context) {
+    Navigator.pushNamed(context, '/online-search');
   }
 
   /// Navigate to book detail screen

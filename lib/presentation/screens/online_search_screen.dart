@@ -6,29 +6,29 @@ import '../../logic/cubits/book_cubit.dart';
 import '../../logic/states/book_state.dart';
 import '../widgets/book_card_widget.dart';
 import '../widgets/progress_indicator_widget.dart';
-import '../widgets/shimmer_loading.dart';
 import 'scanner_screen.dart';
 
-/// Search screen for finding books online and locally
-class SearchScreen extends StatefulWidget {
-  static const String name = 'SearchScreen';
+/// Online search screen for adding new books to the library
+class OnlineSearchScreen extends StatefulWidget {
+  static const String name = 'OnlineSearchScreen';
 
-  const SearchScreen({super.key});
+  const OnlineSearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  State<OnlineSearchScreen> createState() => _OnlineSearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _OnlineSearchScreenState extends State<OnlineSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool _isSearching = false;
-  Set<String> _addedIsbns = {};
 
   @override
   void initState() {
     super.initState();
     _focusNode.requestFocus();
+    // Clear any previous online search results
+    context.read<BookCubit>().clearOnlineSearch();
   }
 
   @override
@@ -46,7 +46,7 @@ class _SearchScreenState extends State<SearchScreen> {
           controller: _searchController,
           focusNode: _focusNode,
           decoration: InputDecoration(
-            hintText: 'Search books by title, author, or ISBN...',
+            hintText: 'Search for books to add...',
             border: InputBorder.none,
             hintStyle: TextStyle(color: Colors.grey.shade500),
           ),
@@ -65,24 +65,19 @@ class _SearchScreenState extends State<SearchScreen> {
         listener: (context, state) {
           if (state is BookOperationSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
-          }
-          if (state is BookFoundByIsbn) {
-            _showIsbnBookDialog(state.book);
-          }
-          if (state is BookNotFoundByIsbn) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Book not found for ISBN: ${state.isbn}')),
+              SnackBar(
+                content: Text(state.message),
+                duration: const Duration(seconds: 2),
+              ),
             );
           }
         },
         builder: (context, state) {
-          if (state is BookLoading || state is IsbnScanning) {
+          if (state is BookLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (state is SearchResultsLoaded) {
+          if (state is OnlineSearchResultsLoaded) {
             return _buildSearchResults(state);
           }
 
@@ -112,24 +107,25 @@ class _SearchScreenState extends State<SearchScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.search,
+              Icons.travel_explore,
               size: 80,
               color: Colors.grey.shade600,
             ),
             const SizedBox(height: 24),
             Text(
-              'Search for Books',
+              'Find Books to Add',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             Text(
-              'Enter a book title, author name, or ISBN to search',
+              'Search by title, author, or ISBN to find books online',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey.shade400,
                   ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
+            
             // Quick actions
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -176,74 +172,140 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSearchResults(SearchResultsLoaded state) {
+  Widget _buildSearchResults(OnlineSearchResultsLoaded state) {
+    if (state.isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Searching...'),
+          ],
+        ),
+      );
+    }
+
     if (!state.hasResults) {
       return EmptyStateWidget(
-        title: 'No results found',
+        title: 'No books found',
         subtitle: 'Try a different search term',
         icon: Icons.search_off,
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 80),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Local results section
-          if (state.localResults.isNotEmpty) ...[
-            _buildSectionHeader('In Your Library', state.localResults.length),
-            ...state.localResults.map((book) => BookCard(book: book)),
-          ],
-          // Online results section
-          if (state.onlineResults.isNotEmpty) ...[
-            _buildSectionHeader('Online Results', state.onlineResults.length),
-            ...state.onlineResults.map((book) => _buildOnlineResultCard(book)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title, int count) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Row(
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+    return Column(
+      children: [
+        // Results count
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.grey.shade900,
+          child: Text(
+            '${state.results.length} result${state.results.length == 1 ? '' : 's'} found',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade400,
                 ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppTheme.infoColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '$count',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.infoColor,
-                  ),
-            ),
+        ),
+        
+        // Results list
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 80),
+            itemCount: state.results.length,
+            itemBuilder: (context, index) {
+              final book = state.results[index];
+              final isAdded = state.addedIsbns.contains(book.isbn);
+              return _buildOnlineResultCard(book, isAdded);
+            },
           ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOnlineResultCard(BookModel book, bool isAdded) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Cover
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: book.thumbnailUrl != null
+                  ? Image.network(
+                      book.thumbnailUrl!,
+                      width: 50,
+                      height: 75,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+                    )
+                  : _buildPlaceholder(),
+            ),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    style: Theme.of(context).textTheme.titleSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    book.author,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade400,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (book.totalPages > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${book.totalPages} pages',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade500,
+                            fontSize: 11,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // Add button
+            IconButton(
+              icon: Icon(
+                isAdded ? Icons.check : Icons.add_circle_outline,
+                color: isAdded ? AppTheme.successColor : AppTheme.infoColor,
+              ),
+              onPressed: isAdded ? null : () => _addBookToLibrary(book),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildOnlineResultCard(BookModel book) {
-    final isAdded = _addedIsbns.contains(book.isbn);
-
-    return SearchResultCard(
-      book: book,
-      isAdded: isAdded,
-      onAdd: isAdded
-          ? null
-          : () => _addBookToLibrary(book),
+  Widget _buildPlaceholder() {
+    return Container(
+      width: 50,
+      height: 75,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(
+        Icons.book,
+        color: Colors.white54,
+        size: 24,
+      ),
     );
   }
 
@@ -251,13 +313,16 @@ class _SearchScreenState extends State<SearchScreen> {
     if (query.trim().isEmpty) return;
 
     setState(() => _isSearching = true);
-    context.read<BookCubit>().searchOnline(query);
+    context.read<BookCubit>().searchOnline(query).then((_) {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    });
   }
 
   void _clearSearch() {
     _searchController.clear();
-    _addedIsbns.clear();
-    context.read<BookCubit>().clearSearch();
+    context.read<BookCubit>().clearOnlineSearch();
   }
 
   Future<void> _addBookToLibrary(BookModel book) async {
@@ -276,9 +341,10 @@ class _SearchScreenState extends State<SearchScreen> {
     if (book.totalPages <= 0) {
       _showPageCountDialog(book);
     } else {
-      context.read<BookCubit>().addBook(book);
+      await context.read<BookCubit>().addBook(book);
+      // Mark as added in search results
       if (book.isbn != null) {
-        setState(() => _addedIsbns.add(book.isbn!));
+        context.read<BookCubit>().markBookAsAdded(book.isbn!);
       }
     }
   }
@@ -312,59 +378,19 @@ class _SearchScreenState extends State<SearchScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final pages = int.tryParse(pagesController.text) ?? 0;
               if (pages > 0) {
                 Navigator.pop(context);
                 final updatedBook = book.copyWith(totalPages: pages);
-                context.read<BookCubit>().addBook(updatedBook);
+                await context.read<BookCubit>().addBook(updatedBook);
+                // Mark as added in search results
                 if (book.isbn != null) {
-                  setState(() => _addedIsbns.add(book.isbn!));
+                  context.read<BookCubit>().markBookAsAdded(book.isbn!);
                 }
               }
             },
             child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showIsbnBookDialog(BookModel book) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Book Found!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              book.title,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              book.author,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (book.totalPages > 0) ...[
-              const SizedBox(height: 8),
-              Text('${book.totalPages} pages'),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _addBookToLibrary(book);
-            },
-            child: const Text('Add to Library'),
           ),
         ],
       ),

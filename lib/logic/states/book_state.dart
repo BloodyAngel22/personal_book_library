@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../data/models/book_model.dart';
+import '../../core/constants/app_constants.dart';
 
 /// Base state for book operations
 abstract class BookState extends Equatable {
@@ -86,22 +87,132 @@ class BookError extends BookState {
   List<Object?> get props => [message];
 }
 
-/// Search results state
-class SearchResultsLoaded extends BookState {
-  final List<BookModel> onlineResults;
-  final List<BookModel> localResults;
+/// Local search results state (for searching in library)
+class LocalSearchResultsLoaded extends BookState {
+  final List<BookModel> results;
   final String query;
+  final LocalSearchFilters filters;
+  final int totalMatches;
 
-  const SearchResultsLoaded({
-    this.onlineResults = const [],
-    this.localResults = const [],
+  const LocalSearchResultsLoaded({
+    this.results = const [],
     this.query = '',
+    this.filters = const LocalSearchFilters(),
+    this.totalMatches = 0,
   });
 
-  bool get hasResults => onlineResults.isNotEmpty || localResults.isNotEmpty;
+  bool get hasResults => results.isNotEmpty;
+
+  LocalSearchResultsLoaded copyWith({
+    List<BookModel>? results,
+    String? query,
+    LocalSearchFilters? filters,
+    int? totalMatches,
+  }) {
+    return LocalSearchResultsLoaded(
+      results: results ?? this.results,
+      query: query ?? this.query,
+      filters: filters ?? this.filters,
+      totalMatches: totalMatches ?? this.totalMatches,
+    );
+  }
 
   @override
-  List<Object?> get props => [onlineResults, localResults, query];
+  List<Object?> get props => [results, query, filters, totalMatches];
+}
+
+/// Filters for local book search
+class LocalSearchFilters extends Equatable {
+  final Set<String> statuses;
+  final String? author;
+  final bool hasProgress;
+  final SortOption sortBy;
+  final bool sortAscending;
+
+  const LocalSearchFilters({
+    this.statuses = const {
+      AppConstants.statusToRead,
+      AppConstants.statusReading,
+      AppConstants.statusFinished,
+    },
+    this.author,
+    this.hasProgress = false,
+    this.sortBy = SortOption.updatedAt,
+    this.sortAscending = false,
+  });
+
+  /// Check if any filter is active
+  bool get hasActiveFilters =>
+      statuses.length < 3 ||
+      (author != null && author!.isNotEmpty) ||
+      hasProgress;
+
+  LocalSearchFilters copyWith({
+    Set<String>? statuses,
+    String? author,
+    bool? hasProgress,
+    SortOption? sortBy,
+    bool? sortAscending,
+    bool clearAuthor = false,
+  }) {
+    return LocalSearchFilters(
+      statuses: statuses ?? this.statuses,
+      author: clearAuthor ? null : (author ?? this.author),
+      hasProgress: hasProgress ?? this.hasProgress,
+      sortBy: sortBy ?? this.sortBy,
+      sortAscending: sortAscending ?? this.sortAscending,
+    );
+  }
+
+  LocalSearchFilters reset() {
+    return const LocalSearchFilters();
+  }
+
+  @override
+  List<Object?> get props => [statuses, author, hasProgress, sortBy, sortAscending];
+}
+
+/// Sort options for books
+enum SortOption {
+  title,
+  author,
+  updatedAt,
+  progress,
+  startDate,
+}
+
+/// Online search results state (for adding new books)
+class OnlineSearchResultsLoaded extends BookState {
+  final List<BookModel> results;
+  final String query;
+  final bool isLoading;
+  final Set<String> addedIsbns;
+
+  const OnlineSearchResultsLoaded({
+    this.results = const [],
+    this.query = '',
+    this.isLoading = false,
+    this.addedIsbns = const {},
+  });
+
+  bool get hasResults => results.isNotEmpty;
+
+  OnlineSearchResultsLoaded copyWith({
+    List<BookModel>? results,
+    String? query,
+    bool? isLoading,
+    Set<String>? addedIsbns,
+  }) {
+    return OnlineSearchResultsLoaded(
+      results: results ?? this.results,
+      query: query ?? this.query,
+      isLoading: isLoading ?? this.isLoading,
+      addedIsbns: addedIsbns ?? this.addedIsbns,
+    );
+  }
+
+  @override
+  List<Object?> get props => [results, query, isLoading, addedIsbns];
 }
 
 /// Scanner state
